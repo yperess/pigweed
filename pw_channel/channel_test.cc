@@ -19,17 +19,16 @@
 #include "pw_assert/check.h"
 #include "pw_compilation_testing/negative_compilation.h"
 
+using pw::channel::kDatagram;
 using pw::channel::kReadable;
 using pw::channel::kReliable;
 using pw::channel::kSeekable;
 using pw::channel::kWritable;
 
-static_assert(static_cast<uint8_t>(pw::channel::DataType::kDatagram) >
-              (kReliable | kReadable | kWritable | kSeekable));
-static_assert(sizeof(::pw::channel::Channel) == 2 * sizeof(void*));
+static_assert(sizeof(::pw::channel::AnyChannel) == 2 * sizeof(void*));
 
-static_assert((kReliable < kReadable) && (kReadable < kWritable) &&
-              (kWritable < kSeekable));
+static_assert((kDatagram < kReliable) && (kReliable < kReadable) &&
+              (kReadable < kWritable) && (kWritable < kSeekable));
 
 class Stub : public pw::channel::ByteChannel<kReliable, kReadable, kWritable> {
  public:
@@ -59,9 +58,40 @@ class Stub : public pw::channel::ByteChannel<kReliable, kReadable, kWritable> {
 
   // Common functions
   pw::async2::Poll<pw::Status> DoPollClose(pw::async2::Context&) override {
-    return pw::Status::Unimplemented();
+    return pw::OkStatus();
   }
 };
+
+TEST(Channel, MethodsShortCircuitAfterCloseReturnsReady) {
+  pw::async2::Dispatcher dispatcher;
+
+  class : public pw::async2::Task {
+   public:
+    Stub channel;
+
+   private:
+    pw::async2::Poll<> DoPend(pw::async2::Context& cx) override {
+      EXPECT_TRUE(channel.is_open());
+      EXPECT_EQ(pw::async2::Ready(pw::OkStatus()), channel.PollClose(cx));
+      EXPECT_FALSE(channel.is_open());
+
+      EXPECT_EQ(pw::Status::FailedPrecondition(),
+                channel.PollRead(cx)->status());
+      EXPECT_EQ(pw::async2::Ready(), channel.PollReadyToWrite(cx));
+      EXPECT_EQ(pw::Status::FailedPrecondition(),
+                channel.Write(pw::multibuf::MultiBuf()).status());
+      EXPECT_EQ(pw::Status::FailedPrecondition(),
+                channel.PollFlush(cx)->status());
+      EXPECT_EQ(pw::async2::Ready(pw::Status::FailedPrecondition()),
+                channel.PollClose(cx));
+
+      return pw::async2::Ready();
+    }
+  } test_task;
+  dispatcher.Post(test_task);
+
+  EXPECT_TRUE(dispatcher.RunUntilStalled().IsReady());
+}
 
 #if PW_NC_TEST(InvalidOrdering)
 PW_NC_EXPECT("Properties must be specified in the following order");
@@ -78,10 +108,12 @@ bool Illegal(pw::channel::ByteChannel<pw::channel::kReliable>& foo) {
 }
 #elif PW_NC_TEST(TooMany)
 PW_NC_EXPECT("Too many properties given");
-bool Illegal(
-    pw::channel::
-        ByteChannel<kReliable, kReliable, kReliable, kReadable, kWritable>&
-            foo) {
+bool Illegal(pw::channel::ByteChannel<kReliable,
+                                      kReliable,
+                                      kReliable,
+                                      kReadable,
+                                      kWritable,
+                                      kWritable>& foo) {
   return foo.is_open();
 }
 #elif PW_NC_TEST(Duplicates)
@@ -393,34 +425,50 @@ TEST(Channel, TestDatagramWriter) {
   EXPECT_STREQ(reinterpret_cast<const char*>(contents), kWriteData);
 }
 
-void TakesAChannel(const pw::channel::Channel&) {}
+void TakesAChannel(const pw::channel::AnyChannel&) {}
 
-void TakesAReadableChannel(
-    const pw::channel::ByteChannel<kReliable, kReadable>&) {}
+void TakesAReadableByteChannel(const pw::channel::ByteChannel<kReadable>&) {}
+
+void TakesAWritableByteChannel(const pw::channel::ByteChannel<kWritable>&) {}
+
+void TakesAReadableDatagramChannel(
+    const pw::channel::DatagramChannel<kReadable>&) {}
 
 void TakesAWritableChannel(pw::channel::ByteChannel<kReliable, kWritable>&) {}
 
 TEST(Channel, Conversions) {
-  const TestByteReader channel;
+  const TestByteReader byte_channel;
+  const TestDatagramWriter datagram_channel;
 
-  TakesAReadableChannel(channel);
-  TakesAChannel(channel);
+  TakesAReadableByteChannel(byte_channel);
+  TakesAChannel(byte_channel);
 
-  [[maybe_unused]] const pw::channel::Channel& plain =
-      channel.as<pw::channel::Channel>();
+  TakesAWritableByteChannel(datagram_channel);
+
+  [[maybe_unused]] const pw::channel::AnyChannel& plain =
+      byte_channel.as<pw::channel::AnyChannel>();
 
 #if PW_NC_TEST(CannotLoseWritability)
   PW_NC_EXPECT("Cannot use a non-writable channel as a writable channel");
-  TakesAWritableChannel(channel);
+  TakesAWritableChannel(byte_channel);
 #endif  // PW_NC_TEST
 }
 
-#if PW_NC_TEST(CannotUseDatagramChannelAsByteChannel)
-PW_NC_EXPECT("Datagram and byte channels are not interchangeable");
-
-void DatagramChannelNcTest(
-    pw::channel::DatagramChannel<kReliable, kReadable>& dgram) {
-  TakesAReadableChannel(dgram);
+#if PW_NC_TEST(CannotUseByteChannelAsDatagramChannel)
+PW_NC_EXPECT("Cannot use a byte channel as a datagram channel");
+void ByteChannelNcTest(pw::channel::ByteChannel<kReliable, kReadable>& bytes) {
+  TakesAReadableDatagramChannel(bytes);
 }
-
+#elif PW_NC_TEST(DuplicateDatagramAttributes)
+PW_NC_EXPECT("Properties must be specified in the following order");
+bool DuplicateAttributesTest(
+    pw::channel::DatagramChannel<pw::channel::kDatagram,
+                                 pw::channel::kReadable>& channel) {
+  return channel.is_open();
+}
+#elif PW_NC_TEST(ByteChannelCannotSetDatagramProperty)
+PW_NC_EXPECT("ByteChannel cannot set the kDatagram property");
+void ByteChannelDatagramTest(
+    pw::channel::ByteChannel<pw::channel::kDatagram, pw::channel::kReadable>&) {
+}
 #endif  // PW_NC_TEST

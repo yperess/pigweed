@@ -12,7 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-#include "pw_allocator/allocator_test_harness.h"
+#include "pw_allocator/test_harness.h"
 
 #include <algorithm>
 #include <climits>
@@ -74,23 +74,28 @@ size_t AlignmentFromLShift(size_t lshift, size_t size) {
 void AllocatorTestHarnessGeneric::GenerateRequests(
     random::RandomGenerator& prng, size_t max_size, size_t num_requests) {
   for (size_t i = 0; i < num_requests; ++i) {
-    AllocatorRequest request;
-    size_t request_type;
-    prng.GetInt(request_type);
-    switch (request_type % 3) {
-      case 0:
-        request = GenerateAllocationRequest(prng, max_size);
-        break;
-      case 1:
-        request = GenerateDeallocationRequest(prng);
-        break;
-      case 2:
-        request = GenerateReallocationRequest(prng, max_size);
-        break;
-    }
-    HandleRequest(request);
+    GenerateRequest(prng, max_size);
   }
   Reset();
+}
+
+void AllocatorTestHarnessGeneric::GenerateRequest(random::RandomGenerator& prng,
+                                                  size_t max_size) {
+  AllocatorRequest request;
+  size_t request_type;
+  prng.GetInt(request_type);
+  switch (request_type % 3) {
+    case 0:
+      request = GenerateAllocationRequest(prng, max_size);
+      break;
+    case 1:
+      request = GenerateDeallocationRequest(prng);
+      break;
+    case 2:
+      request = GenerateReallocationRequest(prng, max_size);
+      break;
+  }
+  HandleRequest(request);
 }
 
 void AllocatorTestHarnessGeneric::HandleRequests(

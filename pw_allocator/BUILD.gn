@@ -35,6 +35,8 @@ group("pw_allocator") {
   ]
 }
 
+# Libraries
+
 pw_source_set("allocator") {
   public_configs = [ ":default_config" ]
   public = [ "public/pw_allocator/allocator.h" ]
@@ -186,47 +188,10 @@ pw_source_set("tracking_allocator") {
   deps = [ dir_pw_assert ]
 }
 
-pw_size_diff("allocator_size_report") {
-  title = "Sizes of various pw_allocator implementations"
-  binaries = [
-    {
-      target = "size_report:split_free_list_allocator"
-      base = "$dir_pw_bloat:bloat_base"
-      label = "SplitFreeListAllocator"
-    },
-    {
-      target = "size_report:split_free_list_allocator_with_unique_ptr"
-      base = "size_report:split_free_list_allocator"
-      label = "Allocator::MakeUnique and UniquePtr"
-    },
-    {
-      target = "size_report:split_free_list_allocator_with_metric_proxy"
-      base = "size_report:split_free_list_allocator"
-      label = "AllocatorMetricProxy wrapping another allocator"
-    },
-  ]
-}
+# Test support
 
-pw_test_group("tests") {
-  tests = [
-    ":allocator_test",
-    ":block_allocator_test",
-    ":block_test",
-    ":fallback_allocator_test",
-    ":freelist_test",
-    ":freelist_heap_test",
-    ":libc_allocator_test",
-    ":multiplex_allocator_test",
-    ":null_allocator_test",
-    ":simple_allocator_test",
-    ":synchronized_allocator_test",
-    ":tracking_allocator_test",
-    ":unique_ptr_test",
-  ]
-}
-
-pw_source_set("allocator_testing") {
-  public = [ "public/pw_allocator/allocator_testing.h" ]
+pw_source_set("testing") {
+  public = [ "public/pw_allocator/testing.h" ]
   public_deps = [
     ":allocator",
     ":block",
@@ -239,11 +204,11 @@ pw_source_set("allocator_testing") {
     dir_pw_unit_test,
   ]
   deps = [ dir_pw_assert ]
-  sources = [ "allocator_testing.cc" ]
+  sources = [ "testing.cc" ]
 }
 
-pw_source_set("allocator_test_harness") {
-  public = [ "public/pw_allocator/allocator_test_harness.h" ]
+pw_source_set("test_harness") {
+  public = [ "public/pw_allocator/test_harness.h" ]
   public_deps = [
     ":allocator",
     dir_pw_containers,
@@ -253,22 +218,24 @@ pw_source_set("allocator_test_harness") {
     "$dir_pw_third_party/fuchsia:stdcompat",
     dir_pw_assert,
   ]
-  sources = [ "allocator_test_harness.cc" ]
+  sources = [ "test_harness.cc" ]
 }
 
-pw_source_set("allocator_fuzzing") {
-  public = [ "public/pw_allocator/allocator_fuzzing.h" ]
+pw_source_set("fuzzing") {
+  public = [ "public/pw_allocator/fuzzing.h" ]
   public_deps = [
-    ":allocator_test_harness",
+    ":test_harness",
     "$dir_pw_fuzzer:fuzztest",
   ]
-  sources = [ "allocator_fuzzing.cc" ]
+  sources = [ "fuzzing.cc" ]
 }
+
+# Tests
 
 pw_test("allocator_test") {
   deps = [
     ":allocator",
-    ":allocator_testing",
+    ":testing",
   ]
   sources = [ "allocator_test.cc" ]
 }
@@ -305,8 +272,8 @@ pw_test("block_allocator_test") {
 
 pw_test("fallback_allocator_test") {
   deps = [
-    ":allocator_testing",
     ":fallback_allocator",
+    ":testing",
     dir_pw_status,
   ]
   sources = [ "fallback_allocator_test.cc" ]
@@ -343,33 +310,9 @@ pw_test("libc_allocator_test") {
   sources = [ "libc_allocator_test.cc" ]
 }
 
-pw_test("multiplex_allocator_test") {
-  deps = [
-    ":allocator_testing",
-    ":multiplex_allocator",
-    dir_pw_tokenizer,
-  ]
-  sources = [ "multiplex_allocator_test.cc" ]
-
-  # TODO: https://pwbug.dev/325509758 - Doesn't work on the Pico yet; hangs
-  # indefinitely.
-  if (pw_build_EXECUTABLE_TARGET_TYPE == "pico_executable") {
-    enable_if = false
-  }
-}
-
 pw_test("null_allocator_test") {
   deps = [ ":null_allocator" ]
   sources = [ "null_allocator_test.cc" ]
-}
-
-pw_test("simple_allocator_test") {
-  deps = [
-    ":allocator_fuzzing",
-    ":allocator_testing",
-    ":simple_allocator",
-  ]
-  sources = [ "simple_allocator_test.cc" ]
 }
 
 pw_test("synchronized_allocator_test") {
@@ -379,9 +322,9 @@ pw_test("synchronized_allocator_test") {
       pw_thread_YIELD_BACKEND != "" &&
       pw_thread_TEST_THREAD_CONTEXT_BACKEND != ""
   deps = [
-    ":allocator_test_harness",
-    ":allocator_testing",
     ":synchronized_allocator",
+    ":test_harness",
+    ":testing",
     "$dir_pw_sync:binary_semaphore",
     "$dir_pw_sync:interrupt_spin_lock",
     "$dir_pw_sync:mutex",
@@ -397,7 +340,7 @@ pw_test("synchronized_allocator_test") {
 
 pw_test("tracking_allocator_test") {
   deps = [
-    ":allocator_testing",
+    ":testing",
     ":tracking_allocator",
   ]
   sources = [ "tracking_allocator_test.cc" ]
@@ -408,14 +351,136 @@ pw_test("tracking_allocator_test") {
 }
 
 pw_test("unique_ptr_test") {
-  deps = [ ":allocator_testing" ]
+  deps = [ ":testing" ]
   sources = [ "unique_ptr_test.cc" ]
+}
+
+pw_test_group("tests") {
+  tests = [
+    ":allocator_test",
+    ":block_allocator_test",
+    ":block_test",
+    ":fallback_allocator_test",
+    ":freelist_test",
+    ":freelist_heap_test",
+    ":libc_allocator_test",
+    ":null_allocator_test",
+    ":synchronized_allocator_test",
+    ":tracking_allocator_test",
+    ":unique_ptr_test",
+  ]
+  group_deps = [ "examples" ]
+}
+
+# Docs
+
+pw_source_set("size_reporter") {
+  public_configs = [ ":default_config" ]
+  public = [ "public/pw_allocator/size_reporter.h" ]
+  public_deps = [
+    ":allocator",
+    "$dir_pw_bloat:bloat_this_binary",
+    dir_pw_bytes,
+  ]
+}
+
+pw_size_diff("concrete_allocators_size_report") {
+  title = "Sizes of various concrete allocator implementations"
+  binaries = [
+    {
+      target = "size_report:best_fit_block_allocator"
+      base = "size_report:base"
+      label = "BestFitBlockAllocator"
+    },
+    {
+      target = "size_report:dual_first_fit_block_allocator"
+      base = "size_report:base"
+      label = "DualFirstFitBlockAllocator"
+    },
+    {
+      target = "size_report:first_fit_block_allocator"
+      base = "size_report:base"
+      label = "FirstFitBlockAllocator"
+    },
+    {
+      target = "size_report:last_fit_block_allocator"
+      base = "size_report:base"
+      label = "LastFitBlockAllocator"
+    },
+    {
+      target = "size_report:libc_allocator"
+      base = "size_report:base"
+      label = "LibCAllocator"
+    },
+    {
+      target = "size_report:null_allocator"
+      base = "size_report:base"
+      label = "NullAllocator"
+    },
+    {
+      target = "size_report:worst_fit_block_allocator"
+      base = "size_report:base"
+      label = "WorstFitBlockAllocator"
+    },
+  ]
+}
+
+pw_size_diff("forwarding_allocators_size_report") {
+  title = "Sizes of various forwarding allocator implementations"
+  binaries = [
+    {
+      target = "size_report:fallback_allocator"
+      base = "size_report:fallback_allocator_base"
+      label = "FallbackAllocator"
+    },
+    {
+      target = "size_report:synchronized_allocator_isl"
+      base = "size_report:first_fit_block_allocator"
+      label = "SynchronizedAllocator<sync::InterruptSpinLock>"
+    },
+    {
+      target = "size_report:synchronized_allocator_mutex"
+      base = "size_report:first_fit_block_allocator"
+      label = "SynchronizedAllocator<sync::Mutex>"
+    },
+    {
+      target = "size_report:tracking_allocator_all_metrics"
+      base = "size_report:first_fit_block_allocator"
+      label = "TrackingAllocator<AllMetrics>"
+    },
+    {
+      target = "size_report:tracking_allocator_no_metrics"
+      base = "size_report:first_fit_block_allocator"
+      label = "TrackingAllocator<NoMetrics>"
+    },
+  ]
+}
+
+pw_size_diff("allocator_utilities_size_report") {
+  title = "Sizes of various allocator utility classes"
+  binaries = [
+    {
+      target = "size_report:unique_ptr"
+      base = "size_report:first_fit_block_allocator"
+      label = "UniquePtr"
+    },
+  ]
 }
 
 pw_doc_group("docs") {
   inputs = [
     "doc_resources/pw_allocator_heap_visualizer_demo.png",
-    "public/pw_allocator/simple_allocator.h",
+    "examples/basic.cc",
+    "examples/block_allocator.cc",
+    "examples/custom_allocator_perf_test.cc",
+    "examples/custom_allocator_test_harness.h",
+    "examples/custom_allocator_test.cc",
+    "examples/custom_allocator.cc",
+    "examples/custom_allocator.h",
+    "examples/linker_sections.cc",
+    "examples/metrics.cc",
+    "examples/size_report.cc",
+    "examples/spin_lock.cc",
   ]
   sources = [
     "api.rst",
@@ -424,5 +489,9 @@ pw_doc_group("docs") {
     "docs.rst",
     "guide.rst",
   ]
-  report_deps = [ ":allocator_size_report" ]
+  report_deps = [
+    ":concrete_allocators_size_report",
+    ":forwarding_allocators_size_report",
+    "examples:custom_allocator_size_report",
+  ]
 }

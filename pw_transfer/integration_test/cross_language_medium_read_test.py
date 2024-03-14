@@ -97,12 +97,22 @@ class MediumTransferReadIntegrationTest(test_fixture.TransferIntegrationTest):
                 """
                 client_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [5, 1]} }
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [5, 1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
                 ]
 
                 server_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [5, 1]} }
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [5, 1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
             ]""",
                 config_pb2.ProxyConfig(),
             ),
@@ -132,12 +142,22 @@ class MediumTransferReadIntegrationTest(test_fixture.TransferIntegrationTest):
                 """
                 client_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [2, 1, -1]} }
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [2, 1, -1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
                 ]
 
                 server_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [1, 2, -1]} }
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [1, 2, -1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
             ]""",
                 config_pb2.ProxyConfig(),
             ),
@@ -177,9 +197,6 @@ class MediumTransferReadIntegrationTest(test_fixture.TransferIntegrationTest):
     def test_medium_client_read_offset_with_drops(
         self, client_type, protocol_version
     ):
-        # TODO: b/323386167 - Re-enable this test once it has been fixed.
-        return
-
         payload = random.Random(67336391945).randbytes(1024)
         config = TransferConfig(
             self.default_server_config(),
@@ -188,13 +205,23 @@ class MediumTransferReadIntegrationTest(test_fixture.TransferIntegrationTest):
                 """
                 client_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [5, 1]} }
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [5, 1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
                 ]
 
                 server_filter_stack: [
                     { hdlc_packetizer: {} },
-                    { keep_drop_queue: {keep_drop_queue: [5, 1]} }
-            ]""",
+                    {
+                        keep_drop_queue: {
+                            keep_drop_queue: [5, 1],
+                            only_consider_transfer_chunks: true,
+                        }
+                    }
+                ]""",
                 config_pb2.ProxyConfig(),
             ),
         )

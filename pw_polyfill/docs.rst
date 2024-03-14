@@ -12,14 +12,11 @@ Adapt code to compile with different C++ standards
 
 C++ standard macro
 ==================
-``pw_polyfill/standard.h`` provides a macro for checking if a C++ standard is
-supported.
+``pw_polyfill/standard.h`` provides macros for checking if a C++ or C standard
+is supported.
 
-.. c:macro:: PW_CXX_STANDARD_IS_SUPPORTED(standard)
-
-   Evaluates true if the provided C++ standard (98, 11, 14, 17, 20) is supported
-   by the compiler. This is a simpler, cleaner alternative to checking the value
-   of the ``__cplusplus`` macro.
+.. doxygendefine:: PW_CXX_STANDARD_IS_SUPPORTED
+.. doxygendefine:: PW_C_STANDARD_IS_SUPPORTED
 
 Language feature macros
 =======================
@@ -33,10 +30,6 @@ work with or without C++ language features.
     - Feature
     - Description
     - Feature test macro
-  * - ``PW_INLINE_VARIABLE``
-    - inline variables
-    - inline if supported by the compiler
-    - ``__cpp_inline_variables``
   * - ``PW_CONSTEXPR_CPP20``
     - ``constexpr``
     - ``constexpr`` if compiling for C++20

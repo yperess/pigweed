@@ -837,7 +837,8 @@ however it is possible to override this from the command line. e.g.
 Facades and backends tutorial
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 This section walks you through an example of configuring :ref:`facade
-<module-pw_build-bazel-pw_cc_facade>` backends in a Pigweed Bazel project.
+<module-pw_build-bazel-pw_facade>` backends in a Pigweed Bazel
+project.
 
 Consider a scenario that you are building a flight controller for a spacecraft.
 But you have very little experience with Pigweed and have just landed here.
@@ -875,7 +876,7 @@ could build your library with:
 .. code-block:: console
 
    bazel build \
-     --@pigweed//targets:pw_chrono_system_clock_backend=@pigweed//pw_chrono_freertos:system_clock_backend \
+     --@pigweed/pw_chrono:system_clock_backend=@pigweed//pw_chrono_freertos:system_clock_backend \
      //:time_is_relative
 
 Then, ``//pw_chrono:system_clock`` will use the FreeRTOS backend
@@ -889,18 +890,18 @@ target:
    //:time_is_relative
     |
     v
-   @pigweed//pw_chrono:system_clock  -------> @pigweed//targets:pw_chrono_system_clock_backend
+   @pigweed//pw_chrono:system_clock  -------> @pigweed//pw_chrono:system_clock_backend
     |                                                    (Injectable)
     |                                                         |
     |                                                         v
     |                                         @pigweed//pw_chrono_freertos:system_clock
     |                                                   (Actual backend)
     v                                                         |
-   @pigweed//pw_chrono:system_clock_facade <------------------.
+   @pigweed//pw_chrono:system_clock.facade <------------------.
 
 When building ``//:time_is_relative``, Bazel checks the dependencies of
 ``@pigweed//pw_chrono:system_clock`` and finds that it depends on
-``@pigweed//targets:pw_chrono_system_clock_backend``, which looks like this:
+``@pigweed//pw_chrono:system_clock_backend``, which looks like this:
 
 .. code-block:: python
 
@@ -918,7 +919,7 @@ flags. By setting
 
 .. code-block:: console
 
-   --@pigweed//targets:pw_chrono_system_clock_backend=\
+   --@pigweed//pw_chrono:system_clock_backend=\
      @pigweed//pw_chrono_freertos:system_clock_backend
 
 on the command line, you told Bazel to override the default and use the
@@ -949,7 +950,7 @@ files and a BUILD file like,
            "public_overrides",
        ],
        deps = [
-           "//pw_chrono:system_clock_facade",
+           "//pw_chrono:system_clock.facade",
        ],
    )
 
@@ -958,7 +959,7 @@ To build your ``//:time_is_relative`` target using this backend, you'd run,
 .. code-block:: console
 
    bazel build //:time_is_relative \
-     --@pigweed//targets:pw_chrono_system_clock_backend=//pw_chrono_my_hardware_rtc:system_clock
+     --@pigweed//pw_chrono:system_clock_backend=//pw_chrono_my_hardware_rtc:system_clock
 
 This modifies the build graph to look something like this:
 
@@ -967,14 +968,14 @@ This modifies the build graph to look something like this:
    //:time_is_relative
     |
     v
-   @pigweed//pw_chrono:system_clock  -------> @pigweed//targets:pw_chrono_system_clock_backend
+   @pigweed//pw_chrono:system_clock  -------> @pigweed//pw_chrono:system_clock_backend
     |                                                    (Injectable)
     |                                                         |
     |                                                         v
     |                                         //pw_chrono_my_hardware_rtc:system_clock
     |                                                   (Actual backend)
     v                                                         |
-   @pigweed//pw_chrono:system_clock_facade <------------------.
+   @pigweed//pw_chrono:system_clock.facade <------------------.
 
 Associating backends with platforms through bazelrc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1085,7 +1086,7 @@ backup computer over to use Pigweed's default FreeRTOS backend:
    .. code-block:: bash
 
      # //.bazelrc
-     build --@pigweed//targets:pw_chrono_system_clock_backend=//targets:system_clock_backend_multiplexer
+     build --@pigweed//pw_chrono:system_clock_backend=//targets:system_clock_backend_multiplexer
 
 Building your target now will result in slightly different build graph. For
 example, running;
@@ -1100,7 +1101,7 @@ Will result in a build graph that looks like;
 
    //:time_is_relative
     |
-   @pigweed//pw_chrono -> @pigweed//targets:pw_chrono_system_clock_backend
+   @pigweed//pw_chrono -> @pigweed//pw_chrono:system_clock_backend
     |                                   (Injectable)
     |                                        |
     |                                        v
@@ -1112,5 +1113,5 @@ Will result in a build graph that looks like;
     |                     //pw_chrono_my_hardware_rtc:system_clock
     |                     (Actual backend)
     v                                        |
-   @pigweed//pw_chrono:pw_chrono_facade <---.
+   @pigweed//pw_chrono:pw_chrono.facade <---.
 

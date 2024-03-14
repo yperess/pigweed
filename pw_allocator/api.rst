@@ -1,11 +1,11 @@
 .. _module-pw_allocator-api:
 
 =============
-API Reference
+API reference
 =============
 .. pigweed-module-subpage::
    :name: pw_allocator
-   :tagline: "pw_allocator: Flexible, safe, and measurable memory allocation"
+   :tagline: pw_allocator: Flexible, safe, and measurable memory allocation
 
 This module provides the following:
 
@@ -170,6 +170,13 @@ macros:
 
 .. doxygendefine:: PW_ALLOCATOR_METRICS_DECLARE
 .. doxygendefine:: PW_ALLOCATOR_METRICS_ENABLE
+
+.. _module-pw_allocator-api-size_reporter:
+
+SizeReporter
+============
+.. doxygenclass:: pw::allocator::SizeReporter
+   :members:
 
 WithBuffer
 ==========

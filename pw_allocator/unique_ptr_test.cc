@@ -15,7 +15,7 @@
 #include <cstddef>
 
 #include "pw_allocator/allocator.h"
-#include "pw_allocator/allocator_testing.h"
+#include "pw_allocator/testing.h"
 #include "pw_unit_test/framework.h"
 
 namespace pw::allocator {
@@ -121,6 +121,26 @@ TEST(UniquePtr, MoveAssignsFromSubClassAndFreesTotalSize) {
   // subclass, not the size of the smaller base class.
   base_ptr.Reset();
   EXPECT_EQ(allocator.deallocate_size(), 128ul);
+}
+
+TEST(UniquePtr, MoveAssignsToExistingDeallocates) {
+  test::AllocatorForTest<256> allocator;
+  std::optional<UniquePtr<size_t>> result = allocator.MakeUnique<size_t>(1);
+  ASSERT_TRUE(result.has_value());
+  UniquePtr<size_t> size1 = std::move(result.value());
+
+  EXPECT_EQ(*size1, 1U);
+
+  result = allocator.MakeUnique<size_t>(2);
+  ASSERT_TRUE(result.has_value());
+  UniquePtr<size_t> size2 = std::move(result.value());
+  EXPECT_EQ(*size2, 2U);
+
+  EXPECT_EQ(allocator.deallocate_size(), 0U);
+
+  size1 = std::move(size2);
+  EXPECT_EQ(allocator.deallocate_size(), sizeof(size_t));
+  EXPECT_EQ(*size1, 2U);
 }
 
 TEST(UniquePtr, DestructorDestroysAndFrees) {

@@ -15,37 +15,36 @@
 load(
     "//pw_build:pigweed.bzl",
     "pw_cc_binary",
-    "pw_cc_facade",
     "pw_cc_test",
+    "pw_facade",
 )
 
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-pw_cc_facade(
+# TODO: pwbug.dev/328679085 - Remove this alias once no-one uses it.
+alias(
     name = "facade",
+    actual = ":pw_trace.facade",
+)
+
+pw_facade(
+    name = "pw_trace",
     hdrs = [
         "public/pw_trace/internal/trace_internal.h",
         "public/pw_trace/trace.h",
     ],
+    backend = ":backend",
     includes = ["public"],
     deps = [
         "//pw_preprocessor",
     ],
 )
 
-cc_library(
-    name = "pw_trace",
-    hdrs = [
-        "public/pw_trace/internal/trace_internal.h",
-        "public/pw_trace/trace.h",
-    ],
-    includes = ["public"],
-    deps = [
-        "//pw_preprocessor",
-        "@pigweed//targets:pw_trace_backend",
-    ],
+label_flag(
+    name = "backend",
+    build_setting_default = ":backend_multiplexer",
 )
 
 cc_library(
@@ -65,8 +64,8 @@ cc_library(
         "public_overrides",
     ],
     deps = [
+        ":pw_trace.facade",
         "//pw_preprocessor",
-        "//pw_trace:facade",
     ],
 )
 
@@ -113,7 +112,7 @@ pw_cc_test(
         "pw_trace_zero/public_overrides",
     ],
     deps = [
-        ":facade",
+        ":pw_trace.facade",
         "//pw_preprocessor",
         "//pw_unit_test",
     ],

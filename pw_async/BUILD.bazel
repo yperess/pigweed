@@ -14,8 +14,8 @@
 
 load(
     "//pw_build:pigweed.bzl",
-    "pw_cc_facade",
     "pw_cc_test",
+    "pw_facade",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -37,9 +37,10 @@ cc_library(
     ],
 )
 
-pw_cc_facade(
-    name = "task_facade",
+pw_facade(
+    name = "task",
     hdrs = ["public/pw_async/task.h"],
+    backend = ":task_backend",
     includes = ["public"],
     deps = [
         ":types",
@@ -49,17 +50,9 @@ pw_cc_facade(
     ],
 )
 
-cc_library(
-    name = "task",
-    hdrs = ["public/pw_async/task.h"],
-    includes = ["public"],
-    deps = [
-        ":types",
-        "//pw_chrono:system_clock",
-        "//pw_function",
-        "//pw_status",
-        "@pigweed//targets:pw_async_task_backend",
-    ],
+label_flag(
+    name = "task_backend",
+    build_setting_default = "//pw_async_basic:task",
 )
 
 cc_library(
@@ -75,21 +68,19 @@ cc_library(
     ],
 )
 
-pw_cc_facade(
-    name = "fake_dispatcher_facade",
-    hdrs = ["public/pw_async/fake_dispatcher.h"],
-    includes = ["public"],
-    deps = [":dispatcher"],
-)
-
-cc_library(
+pw_facade(
     name = "fake_dispatcher",
     hdrs = ["public/pw_async/fake_dispatcher.h"],
+    backend = ":fake_dispatcher_backend",
     includes = ["public"],
     deps = [
         ":dispatcher",
-        "@pigweed//targets:pw_async_fake_dispatcher_backend",
     ],
+)
+
+label_flag(
+    name = "fake_dispatcher_backend",
+    build_setting_default = "//pw_async_basic:fake_dispatcher",
 )
 
 pw_cc_test(

@@ -14,9 +14,9 @@
 
 load(
     "//pw_build:pigweed.bzl",
-    "pw_cc_facade",
     "pw_cc_perf_test",
     "pw_cc_test",
+    "pw_facade",
 )
 load(
     "//pw_build:selects.bzl",
@@ -116,28 +116,27 @@ cc_library(
     visibility = ["//visibility:private"],
 )
 
-pw_cc_facade(
+# TODO: pwbug.dev/328679085 - Remove this alias once no-one uses it.
+alias(
     name = "timer_interface_facade",
+    actual = "timer.facade",
+)
+
+pw_facade(
+    name = "timer",
     hdrs = [
         "public/pw_perf_test/internal/timer.h",
     ],
+    backend = ":test_timer_backend",
     includes = ["public"],
-    visibility = ["//visibility:private"],
     deps = [
         ":duration_unit",
     ],
 )
 
-cc_library(
-    name = "timer",
-    hdrs = [
-        "public/pw_perf_test/internal/timer.h",
-    ],
-    includes = ["public"],
-    deps = [
-        ":duration_unit",
-        "@pigweed//targets:pw_perf_test_timer_backend",
-    ],
+label_flag(
+    name = "test_timer_backend",
+    build_setting_default = ":timer_multiplexer",
 )
 
 cc_library(
@@ -173,7 +172,7 @@ cc_library(
     target_compatible_with = select(TARGET_COMPATIBLE_WITH_HOST_SELECT),
     deps = [
         ":duration_unit",
-        ":timer_interface_facade",
+        ":timer.facade",
         "//pw_chrono:system_clock",
     ],
 )
@@ -203,7 +202,7 @@ cc_library(
     target_compatible_with = select(TARGET_COMPATIBLE_WITH_HOST_SELECT),
     deps = [
         ":duration_unit",
-        ":timer_interface_facade",
+        ":timer.facade",
     ],
 )
 

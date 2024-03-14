@@ -1,4 +1,4 @@
-// Copyright 2023 The Pigweed Authors
+// Copyright 2024 The Pigweed Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -11,18 +11,19 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-#pragma once
 
-#include "pw_allocator/block_allocator.h"
+#include "pw_allocator/size_reporter.h"
 
 namespace pw::allocator {
 
-/// Alias for `DualFirstFitBlockAllocator`.
-///
-/// Previously this was a distinct class, but has been replaced by
-/// `BlockAllocator` using the dual-first-fit allocation strategy. This type is
-/// deprecated and will eventually be removed. Consumers should migrate to
-/// `DualFirstFitBlockAllocator`.
-using SplitFreeListAllocator = DualFirstFitBlockAllocator<>;
+void Run() {
+  SizeReporter size_reporter;
+  size_reporter.MeasureAllocator<void>(nullptr);
+}
 
 }  // namespace pw::allocator
+
+int main() {
+  pw::allocator::Run();
+  return 0;
+}

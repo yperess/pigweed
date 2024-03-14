@@ -16,7 +16,7 @@
 
 #include <cstddef>
 
-#include "pw_allocator/allocator_testing.h"
+#include "pw_allocator/testing.h"
 #include "pw_unit_test/framework.h"
 
 namespace pw::allocator {
@@ -72,15 +72,15 @@ TEST(AllocatorTest, ReallocateSame) {
 
   void* new_ptr = allocator.Reallocate(ptr, layout, layout.size());
 
-  // Reallocate should call Resize.
-  EXPECT_EQ(allocator.resize_ptr(), ptr);
-  EXPECT_EQ(allocator.resize_old_size(), layout.size());
-  EXPECT_EQ(allocator.resize_new_size(), layout.size());
+  // Reallocate should call Resize, but not DoResize.
+  EXPECT_EQ(allocator.resize_ptr(), nullptr);
+  EXPECT_EQ(allocator.resize_old_size(), 0U);
+  EXPECT_EQ(allocator.resize_new_size(), 0U);
 
-  // Allocate should not be called.
+  // DoAllocate should not be called.
   EXPECT_EQ(allocator.allocate_size(), 0U);
 
-  // Deallocate should not be called.
+  // DoDeallocate should not be called.
   EXPECT_EQ(allocator.deallocate_ptr(), nullptr);
   EXPECT_EQ(allocator.deallocate_size(), 0U);
 
@@ -149,6 +149,50 @@ TEST(AllocatorTest, ReallocateLarger) {
   // Overall, Reallocate should succeed.
   EXPECT_NE(new_ptr, nullptr);
   EXPECT_NE(new_ptr, ptr);
+}
+
+// Test fixture for IsEqual tests.
+class BaseAllocator : public Allocator {
+ public:
+  BaseAllocator(void* ptr) : ptr_(ptr) {}
+
+ private:
+  void* DoAllocate(Layout) override {
+    void* ptr = ptr_;
+    ptr_ = nullptr;
+    return ptr;
+  }
+
+  void DoDeallocate(void*, Layout) override {}
+
+  void* ptr_;
+};
+
+// Test fixture for IsEqual tests.
+class DerivedAllocator : public BaseAllocator {
+ public:
+  DerivedAllocator(size_t value, void* ptr)
+      : BaseAllocator(ptr), value_(value) {}
+  size_t value() const { return value_; }
+
+ private:
+  size_t value_;
+};
+
+TEST(AllocatorTest, IsEqualFailsWithDifferentObjects) {
+  std::array<std::byte, 8> buffer;
+  DerivedAllocator derived1(1, buffer.data());
+  DerivedAllocator derived2(2, buffer.data());
+  EXPECT_FALSE(derived1.IsEqual(derived2));
+  EXPECT_FALSE(derived2.IsEqual(derived1));
+}
+
+TEST(AllocatorTest, IsEqualSucceedsWithSameObject) {
+  std::array<std::byte, 8> buffer;
+  DerivedAllocator derived(1, buffer.data());
+  BaseAllocator* base = &derived;
+  EXPECT_TRUE(derived.IsEqual(*base));
+  EXPECT_TRUE(base->IsEqual(derived));
 }
 
 }  // namespace
