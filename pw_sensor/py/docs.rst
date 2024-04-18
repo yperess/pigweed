@@ -23,11 +23,11 @@ sensor using the `metadata_schema.json`_ format, e.g.:
       org: "Bosch"
       part: "BMA4xx"
    channels:
-      acceleration: {}
-      die_temperature: {}
+      acceleration: []
+      die_temperature: []
 
 
-``pw_sensor`` provides a validator which will resolve any 'inherited' properties
+``pw_sensor`` provides a validator which will resolve any 'default' properties
 and make the final YAML easier for code generators to consume. The returned
 dictionary uses the `resolved_schema.json`_ format.
 
@@ -85,9 +85,8 @@ the following structure for a channel:
    <channel_id>:
       "name": "string"
       "description": "string"
-      "units":
-         "name": "string"
-         "symbol": "string"
+      "representation" "enum[signed, unsigned, float]"
+      "units": <string_units_id>
 
 The current design allows us to define red, green, blue, UV, and IR as
 "sub-channels". While we could define them on their own, having a sub-channel
@@ -107,46 +106,44 @@ allows only ``name`` and ``description`` overrides:
 
 When we construct the final sensor metadata, we can list the channels supported
 by that sensor. In some cases, the same channel may be available more than once.
-This happens at times with temperature sensors. In these cases, we can use the
-``indicies`` key in the channel specifier of the metadata file. Generally, if
-the ``indicies`` is ommitted, it will be assumed that there's 1 instance of the
-channel. Otherwise, we might have something like:
+This happens at times with temperature sensors. In these cases, we can list
+multiple instances of a channel. Generally, if no instances are provided, it
+will be assumed that there's 1 instance of the channel. Otherwise, we might have
+something like:
 
 .. code-block:: yaml
 
    channels:
       ambient_temperature:
-         indicies:
-            - name: "-X"
-              description: "temperature measured in the -X direction"
-            - name: "X"
-               description: "temperature measured in the +X direction"
+         -  name: "-X"
+            description: "temperature measured in the -X direction"
+         -  name: "X"
+            description: "temperature measured in the +X direction"
 
 What are attributes?
 ====================
 Attributes are used to change the behavior of a sensor. They're defined using
-the ``attributes`` key and are structured similarly to ``channels`` since they
-can usually be measured in some way. Here's an example:
+the ``attributes`` key and are structured by associating the defined attribute
+type with a channel along with units and a representation (``float``,
+``signed``, or ``unsigned``). Here's an example:
 
 .. code-block:: yaml
 
    attributes:
-      sample_rate:
-         name: "sample rate"
-         description: "frequency at which samples are collected"
-         units:
-            name: "frequency"
-            symbol: "Hz"
+      -  attribute: "sample_rate"
+         channel: "acceleration"
+         units: "frequency"
+         representation: "float"
 
-When associated with a ``sensor``, ``attributes`` again behave like ``channels``
-but without the ``indicies``:
+When associated with a ``sensor``, ``attributes`` define specific instances of
+configurable states for that sensor:
 
 .. code-block:: yaml
 
    compatible: ...
    channels: ...
    attributes:
-      sample_rate: {}
+      -  {}
 
 What are triggers?
 ==================
@@ -161,7 +158,8 @@ looks like:
          name: "FIFO watermark"
          description: "Interrupt when the FIFO watermark has been reached (set as an attribute)"
 
-When associated with a ``sensor``, we simply need to match the right key:
+When associated with a ``sensor``, we simply need to match the right key in a
+list:
 
 .. code-block:: yaml
 
@@ -169,7 +167,7 @@ When associated with a ``sensor``, we simply need to match the right key:
    channels: ...
    attributes: ...
    triggers:
-      fifo_watermark: {}
+      -  fifo_watermark
 
 The ``Validator`` class
 -----------------------
@@ -191,17 +189,20 @@ large/small cake count (for a total of 3 channels):
 
 .. code-block:: yaml
 
-   # File: my/org/sensors/channels.yaml
+   # File: my/org/sensors/cakes.yaml
+   units:
+      cake:
+         symbol: "cakes"
    channels:
      cakes:
-       description: "The number of cakes seen by the sensor"
-       units:
-         symbol: "cake"
-       sub-channels:
-         small:
-            description: "The number of cakes measuring 6 inches or less"
-         large:
-            description: "The number of cakes measuring more than 6 inches"
+         description: "The number of cakes seen by the sensor"
+         representation: "unsigned"
+         units: "cake"
+         sub-channels:
+            small:
+               description: "The number of cakes measuring 6 inches or less"
+            large:
+               description: "The number of cakes measuring more than 6 inches"
 
 The above YAML file will enable a 3 new channels: ``cakes``, ``cakes_small``,
 and ``cakes_large``. All 3 channels will use a unit ``cake``. A sensor
@@ -211,14 +212,14 @@ implementing this channel would provide a definition file:
 
    # File: my/org/sensors/cake/sensor.yaml
    deps:
-      - "my/org/sensors/channels.yaml"
+      - "my/org/sensors/cakes.yaml"
    compatible:
       org: "myorg"
       part: "cakevision"
    channels:
-      cakes: {}
-      cakes_small: {}
-      cakes_large: {}
+      cakes: []
+      cakes_small: []
+      cakes_large: []
 
 When validated, the above YAML will be converted to fill in the defined values.
 This means that ``channels/cakes`` will be automatically filled with:
@@ -234,10 +235,11 @@ This means that ``channels/cakes`` will be automatically filled with:
 
 Output
 ======
-The resulting output is verbose and is intended to allow callers of the
-validation function to avoid having to cross reference values. Currently, there
-will be 4 keys in the returned dictionary: ``sensors``, ``channels``,
-``attributes``, and ``triggers``.
+The resulting output uses references. At times described above, things such as
+``units`` will be referenced from inside a sensor's channel. When validated, the
+corresponding ``units`` entry is guaranteed to be found at the top level
+``units`` map. Currently, there will be 5 keys in the returned dictionary:
+``sensors``, ``channels``, ``attributes``, ``units``, and ``triggers``.
 
 The ``sensors`` key is a dictionary mapping unique identifiers generated from
 the sensor's compatible string to the resolved values. There will always be
@@ -245,13 +247,10 @@ exactly 1 of these since each sensor spec is required to only describe a single
 sensor (we'll see an example soon for how these are merged to create a project
 level sensor description). Each ``sensor`` will contain: ``name`` string,
 ``description`` description struct, ``compatible`` struct, ``channels``
-dictionary, ``attributes`` dictionary, and ``triggers`` dictionary.
+dictionary, ``attributes`` list, and ``triggers`` list.
 
 The difference between the ``/sensors/channels`` and ``/channels`` dictionaries
-is the inclusion of ``indicies`` in the former. The ``indicies`` can be thought
-of as instantiations of the ``/channels``. All other channel properties will be
-exactly the same. ``/attributes`` and ``/triggers`` are the same as in
-``/sensors/*``.
+is that the former can be thought of as instantiating the latter.
 
 Sensor descriptor script
 ------------------------

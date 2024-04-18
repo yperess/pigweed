@@ -123,6 +123,7 @@ def main() -> None:
         "attributes": {},
         "channels": {},
         "triggers": {},
+        "units": {},
         "sensors": {},
     }
     for descriptor_file in args.descriptor_paths:
@@ -150,6 +151,10 @@ def main() -> None:
         for trig_id, trig_spec in content["triggers"].items():
             assert superset["triggers"].get(trig_id) is None
             superset["triggers"][trig_id] = trig_spec
+        # Add units
+        for units_id, units_spec in content["units"].items():
+            assert superset["units"].get(units_id) is None
+            superset["units"][units_id] = units_spec
 
     _LOG.debug("Final descriptor:\n%s", yaml.safe_dump(superset, indent=2))
     _LOG.info("Validating...")
