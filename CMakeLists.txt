@@ -51,7 +51,7 @@ if(CONFIG_ZEPHYR_PIGWEED_MODULE)
   pw_set_zephyr_backend_ifdef(CONFIG_PIGWEED_THREAD
       pw_thread.thread pw_thread_zephyr.thread pw_thread/backend.cmake)
   pw_set_zephyr_backend_ifdef(CONFIG_PIGWEED_SYNC_BINARY_SEMAPHORE
-      pw_sync.mutex pw_sync_zephyr.binary_semaphore_backend pw_sync/backend.cmake)
+      pw_sync.binary_semaphore pw_sync_zephyr.binary_semaphore_backend pw_sync/backend.cmake)
   pw_set_zephyr_backend_ifdef(CONFIG_PIGWEED_SYNC_INTERRUPT_SPIN_LOCK
       pw_sync.interrupt_spin_lock pw_sync_zephyr.interrupt_spin_lock_backend pw_sync/backend.cmake)
   pw_set_zephyr_backend_ifdef(CONFIG_PIGWEED_SYNC_THREAD_NOTIFICATION
@@ -132,6 +132,7 @@ add_subdirectory(pw_router EXCLUDE_FROM_ALL)
 add_subdirectory(pw_rpc EXCLUDE_FROM_ALL)
 add_subdirectory(pw_rpc_transport EXCLUDE_FROM_ALL)
 add_subdirectory(pw_sensor EXCLUDE_FROM_ALL)
+add_subdirectory(pw_sensor_zephyr EXCLUDE_FROM_ALL)
 add_subdirectory(pw_snapshot EXCLUDE_FROM_ALL)
 add_subdirectory(pw_span EXCLUDE_FROM_ALL)
 add_subdirectory(pw_spi EXCLUDE_FROM_ALL)

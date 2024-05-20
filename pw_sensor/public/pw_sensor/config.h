@@ -17,10 +17,16 @@
 #include <cstddef>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include <type_traits>
 
+#include "pw_async2/dispatcher.h"
+#include "pw_async2/poll.h"
 #include "pw_containers/vector.h"
+#include "pw_function/function.h"
 #include "pw_result/result.h"
+#include "pw_sensor/context.h"
+#include "pw_sensor/internal/future.h"
 #include "pw_sensor/types.h"
 #include "pw_status/status.h"
 
@@ -28,14 +34,14 @@ namespace pw::sensor {
 
 class Attribute {
  public:
-  using _float_type = double;
-  using _signed_type = int64_t;
-  using _unsigned_type = uint64_t;
+  using float_type_ = double;
+  using signed_type_ = int64_t;
+  using unsigned_type_ = uint64_t;
 
   template <typename value_type>
   std::enable_if_t<std::is_integral_v<value_type>, pw::Result<value_type>>
   GetValue(const value_type& = value_type()) const {
-    switch (_value_type) {
+    switch (value_type_) {
       case InternalType::UNASSIGNED:
         return pw::Status::Unknown();
       case InternalType::FLOAT:
@@ -45,52 +51,53 @@ class Attribute {
       case InternalType::UNSIGNED_INT: {
         // No need to check the lower bound because internal representation is
         // unsigned and will never be smaller than 0.
-        if (_value._unsigned >
-            (_unsigned_type)std::numeric_limits<value_type>::max()) {
+        if (value_.unsigned_ >
+            (unsigned_type_)std::numeric_limits<value_type>::max()) {
           // Internal value is out of bounds for the requested type
           return pw::Status::InvalidArgument();
         }
-        return static_cast<value_type>(_value._unsigned);
+        return static_cast<value_type>(value_.unsigned_);
       }
       case InternalType::SIGNED_INT: {
-        if (_value._signed <
-                (_signed_type)std::numeric_limits<value_type>::min() ||
-            _value._signed >
-                (_signed_type)std::numeric_limits<value_type>::max()) {
+        if (value_.signed_ <
+                (signed_type_)std::numeric_limits<value_type>::min() ||
+            value_.signed_ >
+                (signed_type_)std::numeric_limits<value_type>::max()) {
           // Internal value is out of bounds for the requested type
           return pw::Status::InvalidArgument();
         }
-        return static_cast<value_type>(_value._signed);
+        return static_cast<value_type>(value_.signed_);
       }
     }
+    PW_UNREACHABLE;
   }
 
   template <typename value_type>
   std::enable_if_t<std::is_floating_point_v<value_type>, pw::Result<value_type>>
   GetValue(const value_type& = value_type()) const {
-    switch (_value_type) {
+    switch (value_type_) {
       case InternalType::UNASSIGNED:
         return pw::Status::Unknown();
       case InternalType::SIGNED_INT: {
-        if (!IsFloatInRange<_signed_type, value_type>(_value._signed)) {
+        if (!IsFloatInRange<signed_type_, value_type>(value_.signed_)) {
           // Internal value is out of bounds for the requested type
           return pw::Status::InvalidArgument();
         }
-        return static_cast<value_type>(_value._signed);
+        return static_cast<value_type>(value_.signed_);
       }
       case InternalType::UNSIGNED_INT: {
-        if (!IsFloatInRange<_signed_type, value_type>(_value._unsigned)) {
+        if (!IsFloatInRange<signed_type_, value_type>(value_.unsigned_)) {
           // Internal value is out of bounds for the requested type
           return pw::Status::InvalidArgument();
         }
-        return static_cast<value_type>(_value._unsigned);
+        return static_cast<value_type>(value_.unsigned_);
       }
       case InternalType::FLOAT: {
-        if (!IsFloatInRange<_float_type, value_type>(_value._float)) {
+        if (!IsFloatInRange<float_type_, value_type>(value_.float_)) {
           // Internal value is out of bounds for the requested type
           return pw::Status::InvalidArgument();
         }
-        return static_cast<value_type>(_value._float);
+        return static_cast<value_type>(value_.float_);
       }
     }
   }
@@ -100,28 +107,29 @@ class Attribute {
                        std::is_unsigned_v<value_type>,
                    pw::Status>
   SetValue(value_type value) {
-    switch (_value_type) {
+    switch (value_type_) {
       case InternalType::UNASSIGNED:
         return pw::Status::Unknown();
       case InternalType::SIGNED_INT: {
-        if (value > std::numeric_limits<_signed_type>::max()) {
+        if (value > std::numeric_limits<signed_type_>::max()) {
           return pw::Status::InvalidArgument();
         }
-        _value._signed = static_cast<_signed_type>(value);
+        value_.signed_ = static_cast<signed_type_>(value);
         return pw::OkStatus();
       }
       case InternalType::FLOAT: {
-        if (value > std::numeric_limits<_float_type>::max()) {
+        if (value > std::numeric_limits<float_type_>::max()) {
           return pw::Status::InvalidArgument();
         }
-        _value._float = static_cast<_float_type>(value);
+        value_.float_ = static_cast<float_type_>(value);
         return pw::OkStatus();
       }
       case InternalType::UNSIGNED_INT: {
-        _value._unsigned = static_cast<_unsigned_type>(value);
+        value_.unsigned_ = static_cast<unsigned_type_>(value);
         return pw::OkStatus();
       }
     }
+    PW_UNREACHABLE;
   }
 
   template <typename value_type>
@@ -129,34 +137,35 @@ class Attribute {
                        std::is_signed_v<value_type>,
                    pw::Status>
   SetValue(value_type value) {
-    switch (_value_type) {
+    switch (value_type_) {
       case InternalType::UNASSIGNED:
         return pw::Status::Unknown();
       case InternalType::FLOAT: {
-        if (!IsFloatInRange<value_type, _float_type>(value)) {
+        if (!IsFloatInRange<value_type, float_type_>(value)) {
           return pw::Status::InvalidArgument();
         }
-        _value._float = static_cast<_float_type>(value);
+        value_.float_ = static_cast<float_type_>(value);
         return pw::OkStatus();
       }
       case InternalType::SIGNED_INT: {
-        _value._signed = static_cast<_signed_type>(value);
+        value_.signed_ = static_cast<signed_type_>(value);
         return pw::OkStatus();
       }
       case InternalType::UNSIGNED_INT: {
         if (value < 0) {
           return pw::Status::InvalidArgument();
         }
-        _value._unsigned = static_cast<_unsigned_type>(value);
+        value_.unsigned_ = static_cast<unsigned_type_>(value);
         return pw::OkStatus();
       }
     }
+    PW_UNREACHABLE;
   }
 
   template <typename value_type>
   std::enable_if_t<std::is_floating_point_v<value_type>, pw::Status> SetValue(
       value_type value) {
-    switch (_value_type) {
+    switch (value_type_) {
       case InternalType::UNASSIGNED:
         return pw::Status::Unknown();
       case InternalType::SIGNED_INT:
@@ -164,7 +173,7 @@ class Attribute {
         // Can't use an int type internally to store a float
         return pw::Status::InvalidArgument();
       case InternalType::FLOAT: {
-        _value._float = static_cast<_float_type>(value);
+        value_.float_ = static_cast<float_type_>(value);
         return pw::OkStatus();
       }
     }
@@ -172,13 +181,13 @@ class Attribute {
 
   template <typename AttributeInstance>
   bool IsInstance() const {
-    return _measurement_type == AttributeInstance::kMeasurementType &&
-           _attribute_type == AttributeInstance::kAttributeType;
+    return measurement_type_ == AttributeInstance::kMeasurementType &&
+           attribute_type_ == AttributeInstance::kAttributeType;
   }
 
   bool EquivalentTo(const Attribute& other) const {
-    return _measurement_type == other._measurement_type &&
-           _attribute_type == other._attribute_type;
+    return measurement_type_ == other.measurement_type_ &&
+           attribute_type_ == other.attribute_type_;
   }
 
   template <typename AttributeInstance>
@@ -221,28 +230,24 @@ class Attribute {
   constexpr Attribute(uint64_t measurement_type,
                       uint32_t attribute_type,
                       InternalType value_type)
-      : _measurement_type(measurement_type),
-        _attribute_type(attribute_type),
-        _value_type(value_type) {}
+      : measurement_type_(measurement_type),
+        attribute_type_(attribute_type),
+        value_type_(value_type) {}
 
-  const uint64_t _measurement_type;
-  const uint32_t _attribute_type;
-  const InternalType _value_type = InternalType::UNASSIGNED;
+  const uint64_t measurement_type_;
+  const uint32_t attribute_type_;
+  const InternalType value_type_ = InternalType::UNASSIGNED;
   union {
-    _float_type _float;
-    _unsigned_type _unsigned;
-    _signed_type _signed;
-  } _value = {0};
+    float_type_ float_;
+    unsigned_type_ unsigned_;
+    signed_type_ signed_;
+  } value_ = {0};
 };
 
-template <size_t kAttributeCount = size_t(-1)>
-class Configuration {
+class ConfigurationBase {
  public:
-  static_assert(kAttributeCount > 0);
-  constexpr Configuration(
-      const std::array<Attribute, kAttributeCount>& attributes)
-      : _attributes(attributes.begin(), attributes.end()) {}
-  constexpr Configuration() = default;
+  ConfigurationBase(pw::Vector<Attribute>& attributes)
+      : attributes_(attributes) {}
 
   template <typename AttributeInstance,
             typename ValueType,
@@ -250,7 +255,7 @@ class Configuration {
                 std::is_convertible_v<ValueType,
                                       typename AttributeInstance::value_type>>>
   pw::Status SetAttribute(ValueType value) {
-    for (auto& it : _attributes) {
+    for (auto& it : attributes_) {
       if (!it.template IsInstance<AttributeInstance>()) {
         continue;
       }
@@ -264,7 +269,7 @@ class Configuration {
       std::is_convertible_v<ValueType, typename AttributeInstance::value_type>,
       pw::Result<ValueType>>
   GetAttribute(const ValueType& = ValueType()) const {
-    for (auto& it : _attributes) {
+    for (auto& it : attributes_) {
       if (!it.template IsInstance<AttributeInstance>()) {
         continue;
       }
@@ -273,35 +278,97 @@ class Configuration {
     return pw::Status::NotFound();
   }
 
-  template <typename AttributeInstance>
-  pw::Status AddAttribute() {
-    return AddAttribute(Attribute::Build<AttributeInstance>());
-  }
-
   pw::Status AddAttribute(const Attribute& attribute) {
-    for (auto& it : _attributes) {
+    for (auto& it : attributes_) {
       if (it.EquivalentTo(attribute)) {
         // We already have this attribute
         return pw::Status::AlreadyExists();
       }
     }
-    if (_attributes.full()) {
+    if (attributes_.full()) {
       return pw::Status::ResourceExhausted();
     }
-    _attributes.push_back(attribute);
+    attributes_.push_back(attribute);
     return pw::OkStatus();
   }
 
  private:
-  pw::Vector<Attribute, kAttributeCount> _attributes;
+  pw::Vector<Attribute>& attributes_;
 };
 
-class ConfigurationFuture {};
+template <size_t kAttributeCount = size_t(-1)>
+class Configuration : public ConfigurationBase {
+ public:
+  static_assert(kAttributeCount > 0);
+  constexpr Configuration(
+      const std::array<Attribute, kAttributeCount>& attributes)
+      : Configuration(attributes.cbegin(), attributes.cend()) {
+        auto it = attributes.cbegin();
+        (void)it;
+      }
+  constexpr Configuration(
+      typename std::array<Attribute, kAttributeCount>::const_iterator begin,
+      typename std::array<Attribute, kAttributeCount>::const_iterator end)
+      : ConfigurationBase(attributes_), attributes_(begin, end) {}
+
+  constexpr Configuration() : ConfigurationBase(attributes_) {}
+
+  template <typename AttributeInstance, typename ValueType>
+  pw::Status SetAttribute(ValueType value) {
+    return ConfigurationBase::SetAttribute<AttributeInstance, ValueType>(value);
+  }
+
+  template <typename AttributeInstance, typename ValueType>
+  pw::Result<ValueType> GetAttribute(const ValueType& = ValueType()) const {
+    return ConfigurationBase::GetAttribute<AttributeInstance, ValueType>();
+  }
+
+  template <typename AttributeInstance>
+  pw::Status AddAttribute() {
+    return AddAttribute(Attribute::Build<AttributeInstance>());
+  }
+
+  using ConfigurationBase::AddAttribute;
+
+ private:
+  pw::Vector<Attribute, kAttributeCount> attributes_;
+};
+
+class SensorContextBase;
+
+class ConfigurationFuture {
+ public:
+ friend class SensorContextBase;
+  using PendFn = pw::Function<pw::async2::Poll<>(
+      SensorContextBase&, ConfigurationBase&, ConfigurationBase&)>;
+  ConfigurationFuture(SensorContextBase& cx,
+                      PendFn&& work,
+                      ConfigurationBase& in,
+                      ConfigurationBase& out)
+      : cx_(cx),
+        pend_impl_(std::move(work)),
+        in_(in),
+        out_(out),
+        last_result_(pw::async2::Pending()) {
+          cx.AddFuture(future_);
+        }
+  pw::async2::Poll<> Pend(pw::async2::Context& cx);
+
+ private:
+  SensorContextBase& cx_;
+  PendFn pend_impl_;
+  ConfigurationBase& in_;
+  ConfigurationBase& out_;
+
+  pw::async2::Poll<> last_result_;
+  internal::Future future_;
+};
 
 class Configurable {
  public:
   virtual ~Configurable() {}
-  virtual ConfigurationFuture GetConfiguration(Configuration<>& out) = 0;
+  virtual ConfigurationFuture GetConfiguration(SensorContextBase& cx,
+                                               ConfigurationBase& out) = 0;
 };
 
 }  // namespace pw::sensor

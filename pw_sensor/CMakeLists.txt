@@ -13,47 +13,42 @@
 # the License.
 
 include($ENV{PW_ROOT}/pw_build/pigweed.cmake)
+#include($ENV{PW_ROOT}/pw_sensor/backend.cmake)
+include($ENV{PW_ROOT}/pw_sensor/sensor.cmake)
 
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/include/pw_sensor/generated/sensor_constants.h
-  COMMAND python3
-    ${CMAKE_CURRENT_LIST_DIR}/py/pw_sensor/sensor_desc.py
-    -I $ENV{PW_ROOT}
-    -g "python3 ${CMAKE_CURRENT_LIST_DIR}/py/pw_sensor/constants_generator.py --package pw.sensor"
-    -o ${CMAKE_CURRENT_BINARY_DIR}/include/pw_sensor/generated/sensor_constants.h
-    ${CMAKE_CURRENT_LIST_DIR}/sensor.yaml
+pw_sensor_library(pw_sensor.constants
+  OUT_HEADER
+    pw_sensor/generated/sensor_constants.h
   DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/py/pw_sensor/sensor_desc.py
     ${CMAKE_CURRENT_LIST_DIR}/py/pw_sensor/constants_generator.py
-    ${CMAKE_CURRENT_LIST_DIR}/sensor.yaml
     ${CMAKE_CURRENT_LIST_DIR}/attributes.yaml
     ${CMAKE_CURRENT_LIST_DIR}/channels.yaml
     ${CMAKE_CURRENT_LIST_DIR}/triggers.yaml
-  COMMENT "Generating header file..."
+  INCLUDES
+    $ENV{PW_ROOT}
+  SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/sensor.yaml
 )
 
-add_custom_target(pw_sensor.generate_constants
-  DEPENDS
-  ${CMAKE_CURRENT_BINARY_DIR}/include/pw_sensor/generated/sensor_constants.h
-)
-
-pw_add_library(pw_sensor INTERFACE
+pw_add_library(pw_sensor STATIC
+  SOURCES
+    configuration_future.cc
   HEADERS
+    public/pw_sensor/internal/future.h
+    public/pw_sensor/config.h
+    public/pw_sensor/context.h
     public/pw_sensor/sensor.h
     public/pw_sensor/types.h
   PUBLIC_INCLUDES
     public
-    ${CMAKE_CURRENT_BINARY_DIR}/include/
   PUBLIC_DEPS
+    pw_async2.dispatcher
+    pw_async2.poll
     pw_containers
+    pw_function
+    pw_sensor.constants
     pw_tokenizer
-)
-target_sources(pw_sensor
-  PUBLIC
-    ${CMAKE_CURRENT_BINARY_DIR}/include/pw_sensor/generated/sensor_constants.h
-)
-set_target_properties(pw_sensor
-  PROPERTIES PRIVATE_DEPENDS "pw_sensor.generate_constants"
 )
 
 pw_add_test(pw_sensor.constants_test
@@ -72,6 +67,7 @@ pw_add_test(pw_sensor.constants_test
 pw_add_test(pw_sensor.configuration_test
   SOURCES
     configuration_test.cc
+    sensor_configuration_test.cc
   PRIVATE_DEPS
     pw_sensor
   GROUPS

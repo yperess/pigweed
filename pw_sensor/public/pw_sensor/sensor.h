@@ -13,28 +13,31 @@
 // the License.
 #pragma once
 
+#include <limits>
+
 #include "pw_sensor/config.h"
 #include "pw_sensor/generated/sensor_constants.h"
 #include "pw_sensor/types.h"
 
 namespace pw::sensor {
 
-template <size_t kAttributeCount>
+template <size_t kAttributeCount = std::numeric_limits<size_t>::max()>
 class Sensor : public Configurable {
  public:
-  constexpr Sensor(
-      const std::array<
-          typename Configuration<kAttributeCount>::GenericAttributeType,
-          kAttributeCount>& attributes)
-      : _attributes(attributes) {}
-
-  ConfigurationFuture GetConfiguration(Configuration<>& out) override {
-    (void)out;
-    return ConfigurationFuture();
+  ConfigurationFuture GetConfiguration(SensorContextBase& cx,
+                                       ConfigurationBase& out) override {
+    return ConfigurationFuture(
+        cx, std::move(GetConfigurationGetWork()), attributes_, out);
   }
 
+ protected:
+  constexpr Sensor(const std::array<Attribute, kAttributeCount>& attributes)
+      : attributes_(attributes) {}
+
+  virtual ConfigurationFuture::PendFn GetConfigurationGetWork() = 0;
+
  private:
-  Configuration<kAttributeCount> _attributes;
+  Configuration<kAttributeCount> attributes_;
 };
 
 }  // namespace pw::sensor
